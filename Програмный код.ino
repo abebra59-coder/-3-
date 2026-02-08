@@ -1,66 +1,23 @@
-/*
-  Task:
-  Phase 1:
-    1) Init sensors. Open claw
-    2) Button press
-    3) Turn +45 deg CCW
-    4) Drive forward 9 cm, close claw
-    5) Drive back 9 cm, turn back -45 deg CW to original heading
-    6) Drive forward 14 cm, open claw (release)
-    7) Drive back 14 cm to starting position
-  
-  Phase 2:
-    8) Turn -45 deg CW
-    9) Drive forward 9 cm, close claw
-   10) Drive back 9 cm
-   11) Turn -45 deg CW (another -45° turn, total -90° from start)
-   12) Drive forward 14 cm, open claw (release)
-   13) Drive back 14 cm to final position (full return)
-
-  Phase 3 (MODIFIED - 13 cm movements):
-   14) Turn -45 deg CW (clockwise)
-   15) Drive forward 13 cm, close claw
-   16) Drive back 13 cm
-   17) Turn +45 deg CCW (counter-clockwise) - back to heading before phase 3
-   18) Drive forward 14 cm, open claw (release)
-   19) Drive back 14 cm to starting position
-
-  Phase 4 (NEW):
-   20) Turn -135 deg CW (clockwise)
-   21) Drive forward 10 cm, close claw
-   22) Drive back 10 cm
-   23) Turn -45 deg CW (clockwise)
-   24) Drive forward 14 cm, open claw (release)
-   25) Drive back 14 cm to final position
-
-  Board: Arduino Nano (ATmega328P Old Bootloader)
-  Motors: DRV8833 (PWM only on IN2)
-  IMU: MPU6050_light
-  Encoder: D2 (single channel)
-  Claw: Servo on D11 (VEX-style microseconds)
-*/
-
 #include <Arduino.h>
 #include <Wire.h>
 #include <MPU6050_light.h>
 #include <Servo.h>
 
-// ================== HW ==================
+
 MPU6050 mpu(Wire);
 Servo vex;
 
-// Motor pins
-const int L_IN1 = 8, L_IN2 = 6;   // IN2 PWM
-const int R_IN1 = 7, R_IN2 = 3;   // IN2 PWM
+const int L_IN1 = 8, L_IN2 = 6;   
+const int R_IN1 = 7, R_IN2 = 3;   
 const int BTN_PIN = 4;
 
-// Encoder
+
 const int ENC_PIN = 2;
 const unsigned long MIN_PULSE_US = 180;
 volatile long encTicks = 0;
 volatile unsigned long lastPulseUs = 0;
 
-// Claw
+
 const int VEX_PIN = 11;
 const int PWM_STOP  = 1500;
 const int PWM_OPEN  = 1800;
@@ -68,7 +25,7 @@ const int PWM_CLOSE = 1300;
 const unsigned long OPEN_MS  = 750;
 const unsigned long CLOSE_MS = 600;
 
-// ================== TURN PD ==================
+
 const float KP = 2.9f;
 const float KD = 0.12f;
 const float TOL_DEG = 0.5f;
@@ -78,14 +35,13 @@ const int MIN_PWM_R = 53;
 const int PWM_MAX = 180;
 const unsigned long MAX_TURN_MS = 6000;
 
-// ================== DRIVE ==================
+
 const long TICKS_PER_METER = 180;
 const int SPEED_FWD = 90;
 const int SPEED_BWD = 90;
 const int TRIM_L = +2;
 const int TRIM_R = 0;
 
-// ================== BUTTON ==================
 bool buttonPressed() { return digitalRead(BTN_PIN) == LOW; }
 void waitButtonPressRelease() {
   while (!buttonPressed()) delay(5);
@@ -94,7 +50,6 @@ void waitButtonPressRelease() {
   delay(80);
 }
 
-// ================== ENCODER ISR ==================
 void isrEnc() {
   unsigned long now = micros();
   if (now - lastPulseUs >= MIN_PULSE_US) {
@@ -118,7 +73,6 @@ long getEnc() {
   return t;
 }
 
-// ================== MOTORS ==================
 void stopAll() {
   digitalWrite(L_IN1, LOW); digitalWrite(L_IN2, LOW);
   digitalWrite(R_IN1, LOW); digitalWrite(R_IN2, LOW);
@@ -157,7 +111,6 @@ int applyMin(int cmd, int minPwm) {
   return s * a;
 }
 
-// ================== CLAW ==================
 void gripperOpen() {
   vex.writeMicroseconds(PWM_STOP);
   delay(120);
@@ -176,7 +129,6 @@ void gripperClose() {
   delay(200);
 }
 
-// ================== TURN RELATIVE (PD) ==================
 void turnRelative(float deg) {
   mpu.update();
   float startYaw = mpu.getAngleZ();
@@ -209,7 +161,6 @@ void turnRelative(float deg) {
   delay(200);
 }
 
-// ================== DRIVE BY ENCODER ==================
 void driveCm(float cm, bool forward) {
   if (cm <= 0.1f) return;
 
@@ -247,7 +198,6 @@ void driveCm(float cm, bool forward) {
   delay(200);
 }
 
-// ================== MAIN ==================
 void setup() {
   pinMode(L_IN1, OUTPUT); pinMode(L_IN2, OUTPUT);
   pinMode(R_IN1, OUTPUT); pinMode(R_IN2, OUTPUT);
@@ -269,97 +219,76 @@ void setup() {
   delay(600);
   mpu.calcOffsets(true, true);
 
-  // 1) Init done -> open claw
   gripperOpen();
 }
 
 void loop() {
-  // 2) Button press to start
+
   waitButtonPressRelease();
 
-  // ===== PHASE 1 =====
-  // 3) Turn +45 deg CCW
   turnRelative(+45.0f);
 
-  // 4) Drive forward 9 cm, close claw
   driveCm(9.0f, true);
   gripperClose();
 
-  // 5) Drive back 9 cm, turn back -45 deg CW
   driveCm(9.0f, false);
   turnRelative(-45.0f);
 
-  // 6) Drive forward 14 cm, open claw (release)
   driveCm(14.0f, true);
   gripperOpen();
 
-  // 7) Drive back 14 cm to starting position
   driveCm(14.0f, false);
 
-  // ===== PHASE 2 =====
-  // 8) Turn -45 deg CW
   turnRelative(-45.0f);
 
-  // 9) Drive forward 9 cm, close claw
   driveCm(9.0f, true);
   gripperClose();
 
-  // 10) Drive back 9 cm
   driveCm(9.0f, false);
 
-  // 11) Turn -45 deg CW (another clockwise turn, total -90° from start heading)
   turnRelative(-45.0f);
 
-  // 12) Drive forward 14 cm, open claw (release)
+
   driveCm(14.0f, true);
   gripperOpen();
 
-  // 13) Drive back 14 cm to final position
   driveCm(14.0f, false);
 
-  // ===== PHASE 3 (MODIFIED - 13 cm movements) =====
-  // 14) Turn -45 deg CW (clockwise)
   turnRelative(-45.0f);
 
-  // 15) Drive forward 13 cm, close claw
+
   driveCm(13.0f, true);
   gripperClose();
 
-  // 16) Drive back 13 cm
+
   driveCm(13.0f, false);
 
-  // 17) Turn +45 deg CCW (counter-clockwise) - back to heading before phase 3 started
+
   turnRelative(+45.0f);
 
-  // 18) Drive forward 14 cm, open claw (release)
   driveCm(14.0f, true);
   gripperOpen();
 
-  // 19) Drive back 14 cm to starting position
   driveCm(14.0f, false);
 
-  // ===== PHASE 4 (NEW SEQUENCE) =====
-  // 20) Turn -135 deg CW (clockwise)
   turnRelative(-135.0f);
 
-  // 21) Drive forward 10 cm, close claw
+
   driveCm(10.0f, true);
   gripperClose();
 
-  // 22) Drive back 10 cm
   driveCm(10.0f, false);
 
-  // 23) Turn -45 deg CW (clockwise)
+ 
   turnRelative(-45.0f);
 
-  // 24) Drive forward 14 cm, open claw (release)
   driveCm(14.0f, true);
   gripperOpen();
 
-  // 25) Drive back 14 cm to final position
+
   driveCm(14.0f, false);
 
-  // Final stop - prevent restart
   stopAll();
   while (true) { delay(50); }
+
 }
